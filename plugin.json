@@ -18,7 +18,8 @@
     "gap_seconds": {"type": "number", "minimum": 0, "default": 8},
     "min_segment_seconds": {"type": "number", "exclusiveMinimum": 0, "default": 3},
     "max_segment_seconds": {"type": "number", "exclusiveMinimum": 0, "default": 90},
-    "extract_mode": {"type": "string", "enum": ["keyframes", "image2"], "default": "keyframes"}
+    "extract_mode": {"type": "string", "enum": ["keyframes", "image2"], "default": "keyframes"},
+    "enable_weapon_detection": {"type": "boolean", "default": true, "description": "Read active HUD weapon names and learn icon samples inside outputDir."}
   },
   "outputSchema": {
     "marks": {"type": "array", "description": "TimePin Mark[] — combat segments kept/reviewed with classification, decision, and outcome metadata."},

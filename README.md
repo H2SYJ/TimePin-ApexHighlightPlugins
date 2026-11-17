@@ -73,6 +73,38 @@ requirements.txt             pinned TimePin SDK archive + onnxruntime
 
 Decode/model/backend failures degrade per-batch to timestamp skeleton rows and log lines (`Frame decode degraded`, `HUD read degraded`, `Layout probe frames undecodable`) rather than failing the whole run; missing models/templates/backends surface as actionable errors (`FileNotFoundError`, `RuntimeError` naming the provider) — there is no silent CPU fallback.
 
+## Weapon recognition
+
+`params.enable_weapon_detection` is a strict boolean, defaults to `true`, and can
+be set to `false` to skip weapon OCR, catalog loading, learning, and weapon
+metadata entirely. The existing HUD icon signature is still read for the combat
+detector's weapon-swap guard.
+
+Weapon identification combines native HUD name OCR, the packaged AHC icon
+catalog, and per-output-directory learned icon samples. Observations are taken
+before each extracted-frame batch is cleaned; only compact timestamped results
+survive across batches. Combat marks summarize the **active** weapon, not both
+carried slots; inactive/spectator frames do not contribute.
+
+TimePin protocol v1 currently defines `Mark.metadata` as `dict[str, str]`, so
+structured values use JSON strings (not nested wire arrays):
+
+```json
+{"weapons":"[\"R-99\",\"Flatline\"]","weapon_timeline":"[{\"t\":12.5,\"weapon\":\"R-99\",\"kind\":\"shoot\"},{\"t\":15.0,\"weapon\":\"Flatline\",\"kind\":\"shoot\"}]"}
+```
+
+Consumers use `JSON.parse(mark.metadata.weapons)` (and likewise for
+`weapon_timeline`) to obtain the arrays requested by the feature. Times are
+absolute seconds in the input video. Unrecognized weapons produce no invented
+name.
+
+Learning never changes the packaged catalog or source MP4. Samples are persisted
+only as `outputDir/learned-weapons.json` and merged on the next `run` using that
+same authorized output directory. A fresh output directory starts with the
+packaged catalog alone; cross-task learning requires reusing/copying the learned
+file under the host's explicit directory authorization. Existing symlinked
+learning paths are rejected instead of following them outside the sandbox.
+
 ## Development
 
 Python `>=3.10,<3.13` is required. From this repository:

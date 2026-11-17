@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from src.app import Application
+from src.config import parse_params
 from src.errors import RpcError
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,6 +64,20 @@ class ApplicationTest(unittest.TestCase):
         self.assertTrue(
             manifest["dependencies"][0].startswith("timepin-vision @ https://")
         )
+
+    def test_weapon_detection_parameter_is_strict_boolean_and_default_on(self):
+        app, _ = self.make_app()
+        schema = app.manifest["parametersSchema"]
+        self.assertIs(parse_params({}, schema)["enable_weapon_detection"], True)
+        self.assertIs(
+            parse_params({"enable_weapon_detection": False}, schema)[
+                "enable_weapon_detection"
+            ],
+            False,
+        )
+        for invalid in (0, 1, "false", None, [], {}):
+            with self.subTest(value=invalid), self.assertRaises(RpcError):
+                parse_params({"enable_weapon_detection": invalid}, schema)
 
     def test_initialize_accepts_documented_framesExtract_key(self):
         app = Application(FakeServer(), ROOT / "plugin.json")
