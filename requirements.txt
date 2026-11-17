@@ -1,0 +1,3 @@
+# Immutable TimePin SDK source; it is not assumed to exist on PyPI.
+timepin-vision @ https://github.com/H2SYJ/TimePin/archive/fbc56579a7dac5ed40d4cd8cff29e27c8acb1e99.zip#subdirectory=plugins/_shared/timepin_vision
+onnxruntime>=1.16,<2

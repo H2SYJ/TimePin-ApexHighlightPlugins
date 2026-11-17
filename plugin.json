@@ -1,0 +1,27 @@
+{
+  "protocolVersion": "1.0.0",
+  "name": "apex-highlight",
+  "version": "0.1.0",
+  "description": "Apex Legends highlight plugin protocol skeleton; detection is not implemented yet.",
+  "author": "TimePin Team",
+  "entry": "main.py",
+  "runtime": "python",
+  "python": ">=3.10,<3.13",
+  "dependencies": [
+    "timepin-vision @ https://github.com/H2SYJ/TimePin/archive/fbc56579a7dac5ed40d4cd8cff29e27c8acb1e99.zip#subdirectory=plugins/_shared/timepin_vision",
+    "onnxruntime>=1.16,<2"
+  ],
+  "capabilities": ["videoframes", "filewrite"],
+  "parametersSchema": {
+    "backend": {"type": "string", "enum": ["cpu", "dml", "cuda"], "default": "cpu"},
+    "sample_fps": {"type": "number", "exclusiveMinimum": 0, "maximum": 120, "default": 2},
+    "gap_seconds": {"type": "number", "minimum": 0, "default": 8},
+    "min_segment_seconds": {"type": "number", "exclusiveMinimum": 0, "default": 3},
+    "max_segment_seconds": {"type": "number", "exclusiveMinimum": 0, "default": 90},
+    "extract_mode": {"type": "string", "enum": ["keyframes", "image2"], "default": "keyframes"}
+  },
+  "outputSchema": {
+    "marks": {"type": "array", "description": "TimePin Mark[]; empty until event detection is implemented."},
+    "evidencePaths": {"type": "array", "items": {"type": "string"}}
+  }
+}
