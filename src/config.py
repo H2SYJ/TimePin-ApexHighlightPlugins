@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping
 
 from .errors import RpcError
-
 
 PROTOCOL_VERSION = "1.0.0"
 PLUGIN_NAME = "apex-highlight"

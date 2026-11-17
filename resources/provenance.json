@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "path": "combat-outcome-profile.json",
+      "sha256": "9099e5b608e6126e4a1095776b56dfcbdcc4f5a5ade3fd358a50e22967df10b8",
+      "bytes": 2946
+    },
+    {
+      "path": "hud_digits_v1.onnx",
+      "sha256": "b59b9f9a7e174310fbf95931259b1765f8dba2f6a6f05de1bd699818ecf0f5f6",
+      "bytes": 555180
+    },
+    {
+      "path": "models/ppocrv6_rec_small.onnx",
+      "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
+      "bytes": 21234383
+    },
+    {
+      "path": "profile-ultrawide.json",
+      "sha256": "5440b2a2f1953017268451dd279878910f209ace34d0f926b02d4bc661751b33",
+      "bytes": 821
+    },
+    {
+      "path": "templates/combat-outcomes/assist-elimination-tc-gray.png",
+      "sha256": "c2db6bfa22fdf4d8a1e7e3511170eecab4fe9fd015cc0ade3358a83166df1a05",
+      "bytes": 546
+    },
+    {
+      "path": "templates/combat-outcomes/assist-elimination-tc-mask.png",
+      "sha256": "2794d636f0f9d8dba2613749a4ed40a9c20133653a4f54842a5f72ce33b5001c",
+      "bytes": 157
+    },
+    {
+      "path": "templates/combat-outcomes/assist-elimination-tc.png",
+      "sha256": "2c651be0e96ecb184e12f8764fc1c9d858bbf8bb6ccb4d90095dcd0803083994",
+      "bytes": 1359
+    },
+    {
+      "path": "templates/combat-outcomes/assist-knock-tc-gray.png",
+      "sha256": "4c0ff029c94171046c3d507f13c281cfed735ed18fa7d0112d43f154bb6de6fb",
+      "bytes": 557
+    },
+    {
+      "path": "templates/combat-outcomes/assist-knock-tc-mask.png",
+      "sha256": "d7d7ae0aa9095ad9f9d43025667c41ad2be0cf2682eae675fff5efc4c6b31b9a",
+      "bytes": 154
+    },
+    {
+      "path": "templates/combat-outcomes/assist-knock-tc.png",
+      "sha256": "19d8ae7275f967337cb12fc28f528c6739f98c21a95a8c555905942bff23ea09",
+      "bytes": 1419
+    },
+    {
+      "path": "templates/combat-outcomes/elimination-tc-gray.png",
+      "sha256": "20564844c7dfc617c8102777bf64c58fb43bcceeaf9c734d5b4cd6c74f3545d0",
+      "bytes": 708
+    },
+    {
+      "path": "templates/combat-outcomes/elimination-tc-mask.png",
+      "sha256": "9061ef7c22915b8c6c4b9c0397366ecc818dd9687a77149023758e10a798ce1d",
+      "bytes": 179
+    },
+    {
+      "path": "templates/combat-outcomes/elimination-tc.png",
+      "sha256": "237837532a3b8404bf6405b320831bece6bf35ae6aab2ea3af3193c2197d8f28",
+      "bytes": 1827
+    },
+    {
+      "path": "templates/combat-outcomes/knock-tc-gray.png",
+      "sha256": "3d7724312d622d5c4affdeea343f924b5366f45ef5a0913706e7eb05d18062e2",
+      "bytes": 516
+    },
+    {
+      "path": "templates/combat-outcomes/knock-tc-mask.png",
+      "sha256": "ea49238cbb9a8964851481551f6462595728e278ce9390a6c0d1d932805c332c",
+      "bytes": 160
+    },
+    {
+      "path": "templates/combat-outcomes/knock-tc.png",
+      "sha256": "f6f9b691b7abcee88f7ad85dd8b48251c0abc693d58b6a6d83e122aeef82e131",
+      "bytes": 1262
+    },
+    {
+      "path": "templates/damage-marker.png",
+      "sha256": "9fbe4bc9558f59e13d23f29ac0104e73bed1dc31a0fa1869a28934ae53c1b5b7",
+      "bytes": 302
+    },
+    {
+      "path": "templates/hud/voice.png",
+      "sha256": "ba215b557205762623097c42fa58f27b3706de2587b15f18e0a68687e851f358",
+      "bytes": 690
+    },
+    {
+      "path": "templates/knockdown-shield.png",
+      "sha256": "b178474a7ff3ceaf710085c7914574255d10843e3fbbe5f789e49810f21ea484",
+      "bytes": 833
+    },
+    {
+      "path": "templates/statistics/assists-gray.png",
+      "sha256": "cbee223ec50bad4bc80b9d627095b512263ada14e132c34e0b0ad0ee9f63c87d",
+      "bytes": 272
+    },
+    {
+      "path": "templates/statistics/digit-0.png",
+      "sha256": "6dce634b4946c5b6eddf4692c1bcbc8f2b4b41b2d8f05c5f479ad42b13fda28f",
+      "bytes": 171
+    },
+    {
+      "path": "templates/statistics/digit-6.png",
+      "sha256": "edc06f249f9a132f209c4090d2ba0a5b24ea2a4f81c279facb29d9b44f159d1d",
+      "bytes": 180
+    },
+    {
+      "path": "templates/statistics/digit-8.png",
+      "sha256": "c050c771690a947e9517f4fa98b647e96b60ac80a62aaad89037f22bdaf8ddb7",
+      "bytes": 214
+    },
+    {
+      "path": "templates/statistics/kills-crown-gray.png",
+      "sha256": "e1b0d79746f561e6a134f135b55d4c6b7874e919f7d1b79c80c72faa0e73ab76",
+      "bytes": 250
+    },
+    {
+      "path": "templates/statistics/kills-gray.png",
+      "sha256": "ea21731f987afac723aad9f5f830c1c2e9e45ce88bb00f7c2e9cfab5efaeb215",
+      "bytes": 200
+    },
+    {
+      "path": "templates/statistics/participation-gray.png",
+      "sha256": "0982bcc3ecfe9a0e44efa629d93f6d2404cda914f0ffc0b916ca61ccfacfeb73",
+      "bytes": 222
+    }
+  ]
+}

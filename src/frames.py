@@ -6,14 +6,13 @@ imports a vision SDK, or writes to the video or scratch directory.
 
 from __future__ import annotations
 
+import math
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
-import math
 from pathlib import Path
-import re
 
 from .errors import RpcError
-
 
 PROTOCOL_VERSION = "1.0.0"
 _SUPPORTED_MODES = ("image2", "keyframes")
