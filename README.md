@@ -111,12 +111,21 @@ Python `>=3.10,<3.13` is required. From this repository:
 
 ```powershell
 python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
-.venv\Scripts\python -m unittest discover -s tests -v
-.venv\Scripts\python -m ruff check main.py src tests
+.venv\Scripts\python -m pip install -r requirements-test.txt
+.venv\Scripts\python -m pytest tests/ -v
+.venv\Scripts\python -m ruff check tests/baseline.py tests/test_baseline.py tests/test_real_video_baseline.py tests/test_parameter_matrix.py tests/test_hud.py tests/test_events.py tests/test_layout.py tests/test_weapon.py
 ```
 
 The suite covers the protocol layer, host-contract differences, wire-style handling, cancellation, golden-parity checks against the AHC algorithms (layout candidates, digit prepare/decode/agreement, counter fallback, event/segment/down/outcome logic), and subprocess end-to-end runs with a mock host.
+
+### Validation levels
+
+- `tests/test_hud.py`, `test_events.py`, `test_layout.py`, `test_weapon.py`: deterministic synthetic crops/sequences and injected recognizers. These are not real-footage accuracy measurements.
+- `tests/test_parameter_matrix.py`: 18 visible cases across `{keyframes,image2} x {cpu,dml,cuda} x {1,2,4}` through initialize/run and the host-file contract. Metadata-stub frames deliberately avoid inference; separate real-session checks enforce explicit provider availability. Mocked GPU requests do **not** prove GPU recognition.
+- `.github/workflows/tests.yml`: Windows CPU runners on Python 3.10/3.11/3.12 install the actual SDK and test dependencies; no private footage, GUI, or physical GPU acceptance.
+- `tests/baseline.py`: opt-in real-video run versus an independent original AHC `analysis.json`. It reports all-Mark counts and strict `<0.5s` start/end errors, preserves mismatches and returns failure on them, rejects unrelated/stale oracles, and checks input integrity. See [private fixture acquisition and baseline commands](tests/fixtures/README.md).
+
+Real recordings/oracles are not bundled or available for this validation delivery. Real Apex parity (both aspect ratios and combat/weapon scenarios), physical GPU inference, and Rust/Tauri host/UI behavior remain **unverified**. The optional generated-video FFmpeg check proves extraction/lifecycle only, not recognition accuracy.
 
 Installation of the immutable SDK archive requires network access and permissions to read the TimePin repository. For offline/local development, install the actual SDK source with `python -m pip install "<TimePin-checkout>/plugins/_shared/timepin_vision"`; do not use `../...` as a manifest dependency. `onnxruntime` selects the CPU package by default; `backend=dml/cuda` requires the matching onnxruntime build — an unavailable provider raises an explicit `RuntimeError`, never a silent CPU fallback.
 

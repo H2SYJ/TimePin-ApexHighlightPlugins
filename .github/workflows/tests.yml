@@ -1,0 +1,44 @@
+name: tests
+
+on:
+  push:
+    branches: [beta, main]
+  pull_request:
+    branches: [beta, main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # plugin.json requires Python >=3.10,<3.13.
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+      - name: Install test dependencies and real SDK (CPU)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-test.txt
+      - name: Lint new validation code
+        run: >-
+          python -m ruff check tests/baseline.py tests/test_baseline.py
+          tests/test_real_video_baseline.py tests/test_parameter_matrix.py
+          tests/test_hud.py tests/test_events.py tests/test_layout.py tests/test_weapon.py
+      - name: Run test suite (CPU)
+        env:
+          # Never upload private footage; real GPU inference needs its own runner.
+          TIMEPIN_RUN_REAL_VIDEO: "0"
+          TIMEPIN_FFMPEG_CONTRACT: "0"
+        run: python -m pytest tests/ -v --tb=short
