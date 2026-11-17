@@ -1,0 +1,4 @@
+# Install the actual pinned SDK and CPU runtime; do not hide missing imports.
+-r requirements.txt
+pytest>=8,<10
+ruff>=0.4,<1
