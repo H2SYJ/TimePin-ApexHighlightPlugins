@@ -45,8 +45,9 @@ def load_manifest(path: Path) -> dict[str, object]:
         "max_segment_seconds",
         "extract_mode",
         "enable_weapon_detection",
+        "hud_info_enabled",
     }:
-        raise ValueError("Expected the seven Apex parameter schemas")
+        raise ValueError("Expected the eight Apex parameter schemas")
     parse_params({}, schema)
     return manifest
 
