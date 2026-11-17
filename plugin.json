@@ -2,7 +2,7 @@
   "protocolVersion": "1.0.0",
   "name": "apex-highlight",
   "version": "0.1.0",
-  "description": "Apex Legends highlight plugin protocol skeleton; detection is not implemented yet.",
+  "description": "Apex Legends HUD recognition plugin: detects shoot/hit/kill/downed combat events and trims segments by own result, squad wipe, and teammate spectate; returns classified highlight Mark[].",
   "author": "TimePin Team",
   "entry": "main.py",
   "runtime": "python",
@@ -21,7 +21,7 @@
     "extract_mode": {"type": "string", "enum": ["keyframes", "image2"], "default": "keyframes"}
   },
   "outputSchema": {
-    "marks": {"type": "array", "description": "TimePin Mark[]; empty until event detection is implemented."},
+    "marks": {"type": "array", "description": "TimePin Mark[] — combat segments kept/reviewed with classification, decision, and outcome metadata."},
     "evidencePaths": {"type": "array", "items": {"type": "string"}}
   }
 }

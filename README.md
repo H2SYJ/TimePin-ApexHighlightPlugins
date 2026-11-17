@@ -1,13 +1,14 @@
 # Apex Highlight
 
-TimePin sidecar plugin for Apex Legends highlight detection. This repository currently implements the versioned plugin protocol skeleton and host-owned frame extraction integration; event detection is intentionally stubbed until the next milestone.
+TimePin sidecar plugin for Apex Legends highlight detection. The plugin ports the apex-highlight-clipper (AHC) HUD recognition pipeline: ultrawide HUD layout detection, dual-model digit reading, combat-event extraction (shoot / hit / kill / downed), downed-protection intervals, and combat-outcome trimming (own result, squad wipe, champion, teammate spectate tail). Output is a versioned `Mark[]` list the host merges into the timeline.
 
 ## Protocol and host contract
 
 - Protocol version `1.0.0`, JSON-RPC 2.0 over UTF-8 JSON Lines (`main.py`).
 - Methods: `initialize`, `run`, `cancel`, `shutdown`; `progress` and `log` notifications.
-- `cancel` is cooperative: a dedicated stdin reader accepts it while `run` executes, `analyze` checks the cancellation event, and `run` returns partial marks/logs.
+- `cancel` is cooperative: a dedicated stdin reader accepts it while `run` executes, the recognition loop checks the cancellation event between frames/batches, and `run` returns partial marks/logs.
 - `frames.extract` is a reverse host-service call. `output_format` is explicitly `png`, `delivery` is `files`, extraction windows are bounded to at most 60 seconds or 128 samples, and temporary frames live only under `outputDir`.
+- The plugin never decodes video itself; every pixel arrives as a host-extracted PNG inside a scratch dir that is removed after the request completes (deletion is skipped if the request was cancelled/failed — the host may still be writing).
 
 ### Known host-contract differences (verified against TimePin `beta` `fbc56579`)
 
@@ -16,48 +17,76 @@ TimePin sidecar plugin for Apex Legends highlight detection. This repository cur
 - TimePin manifest validation uses lowercase capabilities. This manifest uses `videoframes` and `filewrite`; camelCase values such as `fileWrite` are rejected by the host.
 - `parametersSchema` is the properties map directly, not `{type:"object",properties:{...}}`.
 - The TimePin manifest validator rejects relative dependency paths. `timepin_vision` therefore uses a pinned immutable GitHub archive URL in `plugin.json`/`requirements.txt`, targeting the current `beta` commit `fbc56579a7dac5ed40d4cd8cff29e27c8acb1e99`; use a stable release artifact instead when TimePin publishes one.
-- A cancelled frame request only abandons the plugin's wait; it does not prove host FFmpeg stopped. The skeleton does not delete a scratch directory until the request completes.
+- A cancelled frame request only abandons the plugin's wait; it does not prove host FFmpeg stopped. The plugin does not delete a scratch directory until the request completes.
 
 ## Layout
 
 ```text
-plugin.json          TimePin manifest
-main.py              JSON-RPC stdio entry point
-src/errors.py        shared RpcError / Cancelled
-src/config.py        manifest and parameter validation
-src/protocol.py      single-reader bidirectional transport (implemented in TPIN-7)
-src/app.py           lifecycle, path checks, extraction windows, cancellation
-src/frames.py        frames.extract adapter (implemented in TPIN-7)
-src/pipeline.py      cancellable analyze traversal (implemented in TPIN-7)
-src/events.py        event-to-Mark adapter (implemented in TPIN-7)
-resources/           HUD model, profile, and marker templates
-tests/               unit and end-to-end protocol tests
-requirements.txt     pinned TimePin SDK archive + onnxruntime
+plugin.json                  TimePin manifest
+main.py                      JSON-RPC stdio entry point (warms cv2/numpy/ORT
+                             on the main thread — native imports from a worker
+                             thread can deadlock on Windows)
+src/errors.py                shared RpcError / Cancelled
+src/config.py                manifest and parameter validation
+src/protocol.py              single-reader bidirectional transport
+src/app.py                   lifecycle, layout probe, extraction loop,
+                             HUD/outcome orchestration, cancellation
+src/frames.py                frames.extract adapter (wire validation)
+src/extract.py               batch windowing + host-scratch cleanup
+src/layout.py                HUD layout detection (AHC anchored-hud-v2):
+                             pillarbox/stretch/compact candidates, counter-marker
+                             offset scoring, voice-icon name-row confirmation
+src/hud.py                   per-frame HUD reads: ammo/damage/kills counters,
+                             downed marker, inactive view, icon similarity
+src/digits.py                HUD digit reader (AHC hud-digits-v1): primary
+                             CTC ONNX + PP-OCRv6 rec check model agreement
+src/ocr.py                   explicit-backend OCR engine factory
+                             (cpu/dml/cuda, no silent CPU fallback)
+src/stat_counter_fallback.py icon-anchored counter fallback + zero-glyph proof
+src/events.py                pure event detection: shoot/hit/kill rules,
+                             segment merging, combat classification, Mark adapter
+src/downed.py                downed-protection intervals (terminal/recovery tail)
+src/outcome.py               combat-outcome reader (AHC own-center-result-v4):
+                             own result prefix, squad wipe/champion, teammate
+                             spectate continuation, segment decision metadata
+src/pipeline.py              finalize_marks orchestration
+src/resources.py             sha256-verified resource loading (provenance.json)
+resources/                   HUD digit model, profiles, marker/OCR templates,
+                             combat-outcome assets, provenance.json
+tests/                       unit, golden-parity, and subprocess protocol tests
+requirements.txt             pinned TimePin SDK archive + onnxruntime
 ```
 
 ## Recognition resources
 
-`resources/` contains the task-requested HUD digit model, the single available ultrawide profile, and its two marker templates, copied byte-for-byte. See `resources/README.md` for exact source paths, hashes, and the unresolved upstream redistribution-license caveat. Profile template paths are relative to `resources/`. This milestone never loads the model or templates and does not download secondary models.
+`resources/` ships the HUD digit model (`hud_digits_v1.onnx`, sha256 `b59b9f…f5f6`), the PP-OCRv6 rec check model (`models/ppocrv6_rec_small.onnx`, sha256 `6f327246…c484`), the ultrawide HUD profile, combat-outcome profile, and the full template set (counter/knockdown markers, statistics icons, voice icon, combat-outcome toast templates with masks). `resources/provenance.json` + `src/resources.py` verify every file by sha256 at load; a missing or corrupted resource raises `FileNotFoundError`/`RuntimeError` instead of silently degrading. See `resources/README.md` for source paths and the unresolved upstream redistribution-license caveat. The plugin never downloads models at runtime.
+
+## Run flow
+
+1. `initialize` — negotiate protocol + host services (`frames.extract`/`framesExtract` v1).
+2. `run` — bounded windows of host-delivered frames:
+   - Layout probe (`src/layout.detect_images`): picks the HUD profile among ultrawide/stretched/pillarbox/compact candidates by counter-marker score; `unconfirmed` falls back to the default candidate and may be upgraded by the voice-icon name row check.
+   - Per batch (`src/hud.HudReader.read_batch`): ammo/damage/kills crops → digit reader (dual-model agreement) or icon-anchored fallback; downed marker score; inactive-view strip check. Each row feeds `src/outcome.OutcomeReader.observe` (toast prefix / squad-wipe / champion / spectate) before the scratch dir is cleaned.
+   - `finalize_marks` (`src/pipeline`): downed intervals → event detection → segment merge/clip by `gap/min/max` params → combat classification (kept / review / rejected) → outcome decisions and counters → `Mark[]`.
+3. Marks carry `metadata` with classification, decision, coverage, signals, counter basis, and outcome kind so the host UI can explain each segment.
+4. `cancel`/`shutdown` stop the run cooperatively and return partial output.
+
+Decode/model/backend failures degrade per-batch to timestamp skeleton rows and log lines (`Frame decode degraded`, `HUD read degraded`, `Layout probe frames undecodable`) rather than failing the whole run; missing models/templates/backends surface as actionable errors (`FileNotFoundError`, `RuntimeError` naming the provider) — there is no silent CPU fallback.
 
 ## Development
 
 Python `>=3.10,<3.13` is required. From this repository:
 
 ```powershell
-python -m unittest discover -s tests -v
-python -m compileall -q main.py src tests
-ruff check main.py src tests
-ruff format --check main.py src tests
-```
-
-The protocol stub and its tests use only Python's standard library. Recognition dependencies are declared but intentionally not imported during handshake/stub analysis. For the later recognition implementation:
-
-```powershell
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m unittest discover -s tests -v
+.venv\Scripts\python -m ruff check main.py src tests
 ```
 
-Installation of the immutable SDK archive requires network access and permissions to read the TimePin repository. It has not been verified in an isolated plugin venv here. For offline/local development, install the actual SDK source with `python -m pip install "<TimePin-checkout>/plugins/_shared/timepin_vision"`; do not use `../...` as a manifest dependency. `onnxruntime` currently selects the CPU package; `backend=dml/cuda` is accepted/reserved only and does not enable GPU inference in this milestone.
+The suite covers the protocol layer, host-contract differences, wire-style handling, cancellation, golden-parity checks against the AHC algorithms (layout candidates, digit prepare/decode/agreement, counter fallback, event/segment/down/outcome logic), and subprocess end-to-end runs with a mock host.
+
+Installation of the immutable SDK archive requires network access and permissions to read the TimePin repository. For offline/local development, install the actual SDK source with `python -m pip install "<TimePin-checkout>/plugins/_shared/timepin_vision"`; do not use `../...` as a manifest dependency. `onnxruntime` selects the CPU package by default; `backend=dml/cuda` requires the matching onnxruntime build — an unavailable provider raises an explicit `RuntimeError`, never a silent CPU fallback.
 
 ## Lifecycle examples
 
@@ -68,7 +97,7 @@ Each object below is one line on stdin. stdout contains protocol messages only, 
 {"jsonrpc":"2.0","id":2,"method":"run","params":{"taskId":"task-1","video":{"path":"C:/videos/中文视频.mp4","duration":120.0},"params":{"extract_mode":"image2","sample_fps":2},"outputDir":"C:/output/task-1"}}
 ```
 
-`video.path` and `outputDir` must be existing absolute paths; the output directory is authorized and created by TimePin. The plugin emits a `frames.extract` request with its own integer id. The host must answer this request before normal `run` completion; merely piping the two lines above without a bidirectional host is not a full smoke test. Progress includes host fields `taskId/progress/message/marksSoFar` plus versioned `percent/stage` for diagnostics. No detections are fabricated: successful runs return `marks:[]`, `evidencePaths:[]`, and an explicit stub log.
+`video.path` and `outputDir` must be existing absolute paths; the output directory is authorized and created by TimePin. The plugin emits `frames.extract` requests with its own integer id. The host must answer each request before `run` can complete; merely piping the two lines above without a bidirectional host is not a full smoke test. Progress includes host fields `taskId/progress/message/marksSoFar` plus versioned `percent/stage` for diagnostics.
 
 ```json
 {"jsonrpc":"2.0","id":3,"method":"cancel","params":{"taskId":"task-1"}}
@@ -79,8 +108,9 @@ Cancellation is per task; omitted `taskId` means the active run. Wrong-task canc
 
 ## Limitations / integration acceptance
 
-- This is not an Apex recognition implementation: segment parameters are validated/reserved, and no MP4, chapter, or clip output is ever modified/generated.
-- Unit and subprocess mock-host tests exercise the real sidecar, reverse RPC, UTF-8 paths, cancellation, errors, and shutdown. They do **not** prove Tauri UI discovery, actual FFmpeg extraction, SDK installation, or recognition accuracy.
+- The plugin consumes host-extracted PNG frames only; it never opens the MP4, and never writes video/chapter/clip output — only the `Mark[]` response.
+- The recognition logic targets AHC's `anchored-hud-v2` ultrawide layout; other aspect ratios work through the pillarbox/stretch/compact candidates but a layout that never confirms falls back with `layout_status: unconfirmed` and reduced accuracy.
+- Unit and subprocess mock-host tests exercise the real sidecar, reverse RPC, UTF-8 paths, cancellation, errors, shutdown, and golden parity of the ported algorithms. They do **not** prove Tauri UI discovery, actual FFmpeg extraction, real footage accuracy, or embedded-runtime packaging.
 - TimePin currently serializes `run` and `cancel` behind the same process mutex (`src-tauri/src/plugins/manager.rs`), so UI cancellation may not reach this independently cancellable sidecar until run ends. Fixing that is a host task, outside this plugin PR.
 - If extraction is cancelled, times out, or fails before returning, the private `apex-frames-*` directory is retained to avoid racing a still-writing host. Remove it under the authorized output directory once host extraction has stopped. Successfully analyzed batches are cleaned immediately.
 - The pinned TimePin SDK is available in source, but embedded-runtime/venv installation and authenticated/offline packaging remain host/deployment acceptance work.
