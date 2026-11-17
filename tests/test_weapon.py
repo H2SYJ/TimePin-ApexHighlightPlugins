@@ -35,6 +35,7 @@ from src.layout import make_profile
 from src.pipeline import finalize_marks
 from src.weapon import (
     ICON_BYTES,
+    WeaponReader,
     _signature,
     active_slot,
     annotate_events,
@@ -45,7 +46,6 @@ from src.weapon import (
     normalized,
     recognize_text_views,
     resolve_weapon_text,
-    WeaponReader,
 )
 
 PROFILE = make_profile(2560, 1080)

@@ -9,7 +9,8 @@ original `combat-outcome-profile.json` calibration recording and
 portable fixtures. Do not download random gameplay or present synthetic frames
 as replacement accuracy evidence.
 
-Required coverage (all **awaiting recordings and original AHC output**):
+Required coverage (supply an authorized recording and independent AHC output for
+**each** row; these private inputs and their results are not bundled):
 
 | Resolution/scenario | Needed evidence |
 | --- | --- |
@@ -46,8 +47,13 @@ python -B -X utf8 "$ahc/apex_clipper.py" sample $video --out $samples --fps 2
 python -B -X utf8 "$ahc/apex_clipper.py" analyze $video --samples $samples --out $oracle --profile "$ahc/profile-ultrawide.json" --fps 2 --gap 35 --pre 10 --post 15
 ```
 
-Use the appropriate original profile for other resolutions. Never reuse a
-samples directory generated at a different FPS. Preserve the input video's
+Use the appropriate original profile for other resolutions. A 1920x1080 file
+can still contain a stretched 4:3 HUD; do not assume a native profile from its
+container dimensions. Original AHC `hud_layout.detect_video(source, video,
+duration)` can select the profile (`video` supplies width/height). Preserve its
+`layout_status`/score and pass that profile explicitly to `analyze`, which does
+not automatically detect it. Never reuse a samples directory generated at a
+different FPS. Preserve the input video's
 mtime: AHC records `source.path`, `size`, `mtime_ns`; the comparator rejects stale
 or unrelated analysis files. Record FPS separately: original CLI analysis files
 may omit it from `parameters`. Do not hand-edit an oracle to make a check pass.

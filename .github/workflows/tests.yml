@@ -32,8 +32,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-test.txt
       - name: Lint new validation code
+        # Keep the checked rules stable across Ruff releases and local environments.
         run: >-
-          python -m ruff check tests/baseline.py tests/test_baseline.py
+          python -m ruff check --select E4,E7,E9,F,I tests/baseline.py tests/test_baseline.py
           tests/test_real_video_baseline.py tests/test_parameter_matrix.py
           tests/test_hud.py tests/test_events.py tests/test_layout.py tests/test_weapon.py
       - name: Run test suite (CPU)

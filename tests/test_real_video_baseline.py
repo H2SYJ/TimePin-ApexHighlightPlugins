@@ -15,8 +15,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
-
 from baseline import FFmpegFrameService, ffmpeg_path, main, run_plugin, sha256
+
 from src.frames import PROTOCOL_VERSION
 
 

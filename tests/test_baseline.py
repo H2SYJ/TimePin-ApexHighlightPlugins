@@ -6,7 +6,6 @@ import json
 from unittest.mock import patch
 
 import pytest
-
 from baseline import FFmpegFrameService, compare_marks, main, sha256, validate_source
 
 
