@@ -44,8 +44,9 @@ def load_manifest(path: Path) -> dict[str, object]:
         "min_segment_seconds",
         "max_segment_seconds",
         "extract_mode",
+        "enable_weapon_detection",
     }:
-        raise ValueError("Expected the six Apex parameter schemas")
+        raise ValueError("Expected the seven Apex parameter schemas")
     parse_params({}, schema)
     return manifest
 
@@ -65,16 +66,21 @@ def positive_number(value: object, field: str) -> float:
 def parse_params(
     raw: object,
     schema: Mapping[str, object],
-) -> dict[str, str | float]:
+) -> dict[str, str | float | bool]:
     if not isinstance(raw, dict):
         raise RpcError(-32602, "params must be an object")
     if set(raw) - set(schema):
         raise RpcError(-32602, "Unknown plugin parameter")
-    parsed: dict[str, str | float] = {}
+    parsed: dict[str, str | float | bool] = {}
     for name, spec in schema.items():
         if not isinstance(spec, dict) or "default" not in spec:
             raise ValueError(f"Invalid parameter schema: {name}")
         value = raw.get(name, spec["default"])
+        if spec.get("type") == "boolean":
+            if not isinstance(value, bool):
+                raise RpcError(-32602, f"{name} must be a boolean")
+            parsed[name] = value
+            continue
         if spec.get("type") == "string":
             if not isinstance(value, str) or value not in spec.get("enum", []):
                 raise RpcError(-32602, f"Invalid {name}")

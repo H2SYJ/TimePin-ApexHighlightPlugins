@@ -34,7 +34,7 @@ class RunContext:
     video_path: Path
     duration: float
     output_dir: Path
-    params: dict[str, str | float]
+    params: dict[str, str | float | bool]
     sample_points: list[float]
     cancel_event: threading.Event = field(default_factory=threading.Event)
     profile_layout_version: str | None = None
@@ -140,6 +140,8 @@ class Application:
         返回的 row 写入两份时间戳：``t``（宿主拼写，HUD 行原有契约）
         与 ``time``（AHC 事件/倒地/结果模块统一的秒时间戳）。
         """
+        if not isinstance(images, Sequence):
+            images = None  # defensive: caller may pass Frame objects instead
         reader = getattr(ctx, "_hud_reader", None)
         if reader is None and profile is not None:
             from .hud import HudReader
@@ -191,6 +193,21 @@ class Application:
             )
             ctx._outcome_reader = outcome
         return outcome
+
+    def _weapon_reader(self, ctx: RunContext, profile: dict[str, object]):
+        """懒加载 WeaponReader，复用已检测的 HUD layout profile。"""
+        from .weapon import WeaponReader
+
+        reader = getattr(ctx, "_weapon_reader", None)
+        if reader is None:
+            reader = WeaponReader(
+                profile,
+                backend=str(ctx.params["backend"]),
+                output_dir=ctx.output_dir,
+                cancel_event=ctx.cancel_event,
+            )
+            ctx._weapon_reader = reader
+        return reader
 
     def dispatch(self, method: str, params: dict[str, object]) -> object:
         if method == "initialize":
@@ -423,6 +440,30 @@ class Application:
                         images,
                         [frame.pts_sec for frame in batch],
                     )
+                    # 武器 OCR/图标比对必须在 scratch 清理前完成，结果持久化到行。
+                    if (
+                        profile_data is not None
+                        and ctx.params.get("enable_weapon_detection") is not False
+                        and images is not None
+                    ):
+                        weapon_reader = self._weapon_reader(ctx, profile_data)
+                        times = [f.pts_sec for f in batch]
+                        weapon_observations = weapon_reader.sample(
+                            images, times=times, rows=batch_rows
+                        )
+                        for row, obs in zip(batch_rows, weapon_observations):
+                            if obs.get("weapon_id"):
+                                row["current_weapon"] = {
+                                    "id": obs["weapon_id"],
+                                    "name": obs["weapon_name"],
+                                    "category": obs["weapon"].get("category") if obs.get("weapon") else None,
+                                    "variant": obs.get("weapon_variant"),
+                                }
+                                row["weapon"] = obs["weapon_name"]
+                                row["weapon_id"] = obs["weapon_id"]
+                                row["weapon_confidence"] = obs.get("confidence", 0.0)
+                                row["weapon_method"] = obs.get("weapon_method")
+                            row["weapon_observation"] = obs
                     rows.extend(batch_rows)
                 processed = len(rows)
                 start = end
@@ -431,6 +472,10 @@ class Application:
 
             if ctx.cancel_event.is_set():
                 raise Cancelled()
+            # 持久化学习样本到 outputDir/learned-weapons.json（仅当有新样本且未取消）
+            weapon_reader = getattr(ctx, "_weapon_reader", None)
+            if weapon_reader is not None:
+                weapon_reader.save_learning()
             final = finalize_marks(
                 rows,
                 ctx.duration,

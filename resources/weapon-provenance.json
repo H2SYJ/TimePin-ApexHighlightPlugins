@@ -1,0 +1,49 @@
+{
+  "schema": "timepin-weapon-provenance-v1",
+  "purpose": "Documents the exact upstream algorithms and immutable catalog snapshot used by src/weapon.py. This file is metadata; resources/provenance.json remains owned by the main runtime.",
+  "generated": "2026-11-17",
+  "bundled_resources": [
+    {
+      "path": "weapon-catalog.json",
+      "sha256": "f7b91888615f7200d1b475f23325390ea2389f35c0a53d540fc59c94abf80994",
+      "bytes": null,
+      "source": "F:/apex-highlight-clipper-codex-main/weapon-catalog.json",
+      "note": "Byte-for-byte upstream snapshot version=2 checked 2026-10-08: 29 base weapons plus supplemental epg1, sheila and snipers_mark. Only nemesis, alternator and car contain real-video edge icon prototypes (11 total); other weapons have text aliases only."
+    }
+  ],
+  "adapted_sources": [
+    {
+      "path": "F:/apex-highlight-clipper-codex-main/weapon_reader.py",
+      "sha256": "7adf16e8268b12d46d7f677f464376196bd1062e50ee2f5ba53bc08233ce06d7",
+      "note": "Native HUD text normalization/resolution, active-slot/background selection, caption views, constrained CTC label repair and icon signatures."
+    },
+    {
+      "path": "F:/apex-highlight-clipper-codex-main/event_weapon_reader.py",
+      "sha256": "84cbb68c414e4c80e7226efa1eca6f587ed5c0e8a4e4aebd0b398f7314d5821a",
+      "note": "Non-causal event weapon context: firing ammo-drop proof, held-at/before-event evidence, excluded view handling and weapon-icon masks."
+    },
+    {
+      "path": "F:/apex-highlight-clipper-codex-main/build_weapon_catalog.py",
+      "sha256": "ac0c1f6c71e6bcdc0cfd8953377869f75f55444cc6fd524aafc4f94f1ef6f18b",
+      "note": "Official catalog/alias source metadata. The generated catalog snapshot is bundled instead of downloading or rebuilding at runtime."
+    },
+    {
+      "path": "F:/apex-highlight-clipper-codex-main/apex_clipper.py",
+      "sha256": "ec08974cef2db455b378494593319a59b4d353a565116928b12be3d997efa918",
+      "note": "Shoot-event annotation thresholds, learned/local prototype margin rules and the explicit prohibition against treating held weapon context as kill attribution."
+    }
+  ],
+  "runtime_models": [
+    {
+      "path": "models/ppocrv6_rec_small.onnx",
+      "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
+      "note": "Existing bundled RapidOCR recognition model reused lazily by WeaponReader. Upstream referenced a PP-OCRv5 mobile model, but that source repository did not include it; no model is newly bundled or downloaded."
+    }
+  ],
+  "safety": [
+    "No original video or resource file is modified.",
+    "The catalog is loaded read-only and verified against CATALOG_SHA256 in src/weapon.py.",
+    "Learning writes only output_dir/learned-weapons.json when save_learning() is explicitly called; pending samples are not active in the same reader.",
+    "Learned samples are accepted only for catalog-known weapon IDs/variants. OCR text that resolves to no catalog weapon cannot invent a new weapon identity."
+  ]
+}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 from collections.abc import Callable, Mapping, Sequence
 
@@ -87,6 +88,20 @@ def _metadata(segment: Mapping[str, object], sample_fps: float) -> dict[str, str
         metadata["outcome_kinds"] = ",".join(
             sorted({str(e.get("kind")) for e in events})
         )
+    weapons = [e.get("weapon") for e in events if e.get("weapon")]
+    if weapons:
+        metadata["weapons"] = json.dumps(sorted(set(weapons)))
+    timeline = [
+        {
+            "t": float(e["time"]),
+            "weapon": e.get("weapon") or "未知枪",
+            "kind": e.get("kind"),
+        }
+        for e in events
+        if e.get("kind") == "shoot"
+    ]
+    if timeline:
+        metadata["weapon_timeline"] = json.dumps(timeline, ensure_ascii=False)
     return metadata
 
 
@@ -135,6 +150,26 @@ def finalize_marks(
     events = detect_events(row_list)
     if cancelled():
         raise Cancelled()
+    weapon_rows = []
+    if params.get("enable_weapon_detection") is not False:
+        for row in row_list:
+            obs = row.get("weapon_observation")
+            if obs and isinstance(obs, dict):
+                obs_time = (
+                    obs.get("actual_pts")
+                    or row.get("time")
+                    or row.get("t")
+                )
+                if obs_time is not None:
+                    obs = dict(obs)  # shallow copy to avoid mutating caller rows
+                    obs["actual_pts"] = float(obs_time)
+                    weapon_rows.append(obs)
+    if weapon_rows:
+        from .weapon import annotate_events
+
+        events = annotate_events(events, weapon_rows, cancel_event=cancel_event)
+        if cancelled():
+            raise Cancelled()
     segments = segments_from_events(
         events,
         duration,
