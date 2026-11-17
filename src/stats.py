@@ -13,7 +13,7 @@ from typing import Any
 import cv2
 import numpy as np
 
-from .counter import counter_box, counter_offset, digit_span, numeric, translate
+from .counter import counter_box, counter_offset, digit_span, numeric
 from .extra import CombatStats
 from .hud_layout import read_image, template_for
 

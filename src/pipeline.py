@@ -24,12 +24,10 @@ from .extra import (
     CombatStats,
     HUDInfo,
     PlayerNameInfo,
-    TeammateInfo,
     create_empty_hud_info,
-    hud_info_to_metadata,
 )
 from .hud_layout import detect_images, read_image
-from .counter import counter_offset, inactive_view, numeric
+from .counter import inactive_view, numeric
 from .rank_reader import RankReader
 from .hero_reader import HeroReader
 from .name_reader import (
@@ -279,7 +277,6 @@ def _extract_hud_info(
     decode = _make_digit_decoder()
     if decode is not None:
         try:
-            marker = read_image(profile["counter_marker"], 0)
             stat_frames = _even_sample(loaded, STAT_SAMPLE_MAX)
             delta, _score = find_counter_delta([img for _, img in stat_frames], profile)
             if delta is not None:

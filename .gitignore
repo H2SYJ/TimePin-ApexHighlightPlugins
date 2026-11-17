@@ -6,6 +6,11 @@ __pycache__/
 htmlcov/
 .pytest_cache/
 
+# Build artifacts
+dist/
+*.tppkg
+*.zip
+
 # Private recordings, AHC analysis, extracted frames, and learned weapon data.
 /tests/fixtures/*
 !/tests/fixtures/README.md
