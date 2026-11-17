@@ -2,7 +2,7 @@
   "protocolVersion": "1.0.0",
   "name": "apex-highlight",
   "version": "0.1.0",
-  "description": "Apex Legends HUD recognition plugin: detects shoot/hit/kill/downed combat events and trims segments by own result, squad wipe, and teammate spectate; returns classified highlight Mark[].",
+  "description": "Apex Legends HUD recognition plugin: detects shoot/hit/kill/downed combat events with optional HUD info enrichment (rank, hero, player names, combat stats); returns classified highlight Mark[].",
   "author": "TimePin Team",
   "entry": "main.py",
   "runtime": "python",
@@ -19,7 +19,8 @@
     "min_segment_seconds": {"type": "number", "exclusiveMinimum": 0, "default": 3},
     "max_segment_seconds": {"type": "number", "exclusiveMinimum": 0, "default": 90},
     "extract_mode": {"type": "string", "enum": ["keyframes", "image2"], "default": "keyframes"},
-    "enable_weapon_detection": {"type": "boolean", "default": true, "description": "Read active HUD weapon names and learn icon samples inside outputDir."}
+    "enable_weapon_detection": {"type": "boolean", "default": true, "description": "Read active HUD weapon names and learn icon samples inside outputDir."},
+    "hud_info_enabled": {"type": "boolean", "default": false}
   },
   "outputSchema": {
     "marks": {"type": "array", "description": "TimePin Mark[] — combat segments kept/reviewed with classification, decision, and outcome metadata."},

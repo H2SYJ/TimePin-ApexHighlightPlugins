@@ -1,10 +1,14 @@
-"""Cancellable metadata traversal plus the AHC post-extraction finalize chain."""
+"""Cancellable metadata traversal plus the AHC post-extraction finalize chain with optional HUD info enrichment."""
 
 from __future__ import annotations
 
 import json
 import threading
 from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
+from typing import Any
+
+import numpy as np
 
 from .downed import downed_intervals
 from .errors import Cancelled
@@ -16,8 +20,303 @@ from .events import (
     segments_from_events,
 )
 from .frames import Frame
+from .extra import (
+    CombatStats,
+    HUDInfo,
+    PlayerNameInfo,
+    TeammateInfo,
+    create_empty_hud_info,
+    hud_info_to_metadata,
+)
+from .hud_layout import detect_images, read_image
+from .counter import counter_offset, inactive_view, numeric
+from .rank_reader import RankReader
+from .hero_reader import HeroReader
+from .name_reader import (
+    NameReader,
+    canonical_name,
+    consensus_name,
+    names_to_infos,
+)
+from .stats import StatCounter, StatReader, find_counter_delta
+
 
 PROGRESS_INTERVAL = 32
+# Per-field sampling bounds — recognition is per-frame cheap but HUD state is
+# stable, so a handful of well-spread frames carries the signal.
+LAYOUT_SAMPLE_MAX = 8
+FIELD_SAMPLE_MAX = 6
+STAT_SAMPLE_MAX = 10
+
+_DIGITS_MODEL = Path(__file__).resolve().parent.parent / "resources" / "hud_digits_v1.onnx"
+
+
+def _even_sample(items: Sequence[Any], limit: int) -> list[Any]:
+    if len(items) <= limit:
+        return list(items)
+    step = (len(items) - 1) / max(1, limit - 1)
+    return [items[round(i * step)] for i in range(limit)]
+
+
+def _consensus_single(
+    values: list[dict[str, Any] | None], key: str, minimum: int = 2
+) -> dict[str, Any] | None:
+    """Two-frame-consensus for categorical fields (rank tier, hero id)."""
+    from collections import Counter
+
+    rows = [v for v in values if v and v.get(key)]
+    if not rows:
+        return None
+    counts = Counter(v[key] for v in rows)
+    common, n = counts.most_common(1)[0]
+    if n < minimum:
+        return None
+    selected = [v for v in rows if v[key] == common]
+    return {
+        **min(selected, key=lambda v: -v.get("confidence", 0)),
+        "confidence": min(v.get("confidence", 0) for v in selected),
+    }
+
+
+def _make_name_recognizer() -> Callable[[list[np.ndarray]], list[tuple[str, float]]] | None:
+    """Batch recognizer over image crops via the SDK OCR engine (multilingual)."""
+    try:
+        from timepin_vision import OcrEngine
+    except Exception:
+        return None
+    try:
+        engine = OcrEngine()
+    except Exception:
+        return None
+
+    def recognize(images: list[np.ndarray]) -> list[tuple[str, float]]:
+        out: list[tuple[str, float]] = []
+        for image in images:
+            try:
+                results, _ = engine.recognize(image)
+            except Exception:
+                out.append(("", 0.0))
+                continue
+            if not results:
+                out.append(("", 0.0))
+                continue
+            text = " ".join(t for t, _, _ in results)
+            conf = float(min(c for _, c, _ in results))
+            out.append((text, conf))
+        return out
+
+    return recognize
+
+
+def _make_digit_decoder() -> Callable[[np.ndarray], tuple[str, float] | None] | None:
+    if not _DIGITS_MODEL.is_file():
+        return None
+    try:
+        from timepin_vision import OnnxDigitDecoder
+
+        decoder = OnnxDigitDecoder(_DIGITS_MODEL)
+    except Exception:
+        return None
+
+    def decode(image: np.ndarray) -> tuple[str, float] | None:
+        result = decoder(image)
+        if isinstance(result, (tuple, list)) and len(result) >= 2:
+            return str(result[0]), float(result[1])
+        return None
+
+    return decode
+
+
+def _extract_hud_info(
+    frames: Sequence[Frame],
+    params: Mapping[str, object],
+    *,
+    cancel_event: threading.Event,
+) -> HUDInfo:
+    """Extract optional HUD info (rank, hero, player name, teammates, stats).
+
+    Every field is best-effort: a failed read leaves None and never raises
+    beyond cancellation.
+    """
+    if not params.get("hud_info_enabled", False):
+        return create_empty_hud_info()
+
+    hud_info = create_empty_hud_info()
+    if not frames:
+        return hud_info
+
+    # Load a bounded spread of playable frames (decode once, reuse everywhere).
+    sample_frames = _even_sample(list(frames), LAYOUT_SAMPLE_MAX)
+    loaded: list[tuple[Frame, np.ndarray]] = []
+    for frame in sample_frames:
+        if cancel_event.is_set():
+            raise Cancelled()
+        image = read_image(frame.path)
+        if image is not None and not inactive_view(image):
+            loaded.append((frame, image))
+    if not loaded:
+        return hud_info
+
+    images = [image for _, image in loaded]
+    h, w = images[0].shape[:2]
+
+    # Layout detection — the counter marker anchors every HUD crop.
+    try:
+        profile = detect_images(images, w, h)
+    except Exception:
+        profile = None
+    if profile is None:
+        return hud_info
+
+    # --- Rank & hero (template matching, cheap) ---------------------------------
+    field_frames = _even_sample(loaded, FIELD_SAMPLE_MAX)
+    rank_reader = RankReader()
+    hero_reader = HeroReader()
+
+    rank_reads: list[dict[str, Any] | None] = []
+    hero_reads: list[dict[str, Any] | None] = []
+    for _, image in field_frames:
+        if cancel_event.is_set():
+            raise Cancelled()
+        try:
+            rank = rank_reader.inspect(image, profile)
+        except Exception:
+            rank = None
+        rank_reads.append(
+            {
+                "tier": rank.tier,
+                "name": rank.name,
+                "division": rank.division,
+                "confidence": rank.confidence or 0.0,
+                "method": rank.method,
+                "mode": rank.mode,
+            }
+            if rank is not None
+            else None
+        )
+        try:
+            hero = hero_reader.inspect(image, profile)
+        except Exception:
+            hero = None
+        hero_reads.append(
+            {
+                "id": hero.id,
+                "name": hero.name,
+                "confidence": hero.confidence or 0.0,
+                "method": hero.method,
+            }
+            if hero is not None
+            else None
+        )
+
+    # Rank mode ('other' = non-BR mode icon seen) is itself a valid read.
+    mode_rows = [r for r in rank_reads if r and r.get("mode") == "other"]
+    if len(mode_rows) >= 2:
+        best = max(mode_rows, key=lambda r: r["confidence"] or 0.0)
+        hud_info.rank.tier = None
+        hud_info.rank.mode = "other"
+        hud_info.rank.method = best["method"]
+        hud_info.rank.confidence = best["confidence"]
+    else:
+        rank = _consensus_single(rank_reads, "tier")
+        if rank:
+            # Division must also agree on two frames to be trusted.
+            divisions = [r["division"] for r in rank_reads if r and r.get("tier") == rank["tier"] and r.get("division")]
+            from collections import Counter
+
+            div_counts = Counter(divisions)
+            division = (
+                div_counts.most_common(1)[0][0] if div_counts and div_counts.most_common(1)[0][1] >= 2 else None
+            )
+            hud_info.rank.tier = rank["tier"]
+            hud_info.rank.name = rank["name"]
+            hud_info.rank.division = division
+            hud_info.rank.confidence = rank["confidence"]
+            hud_info.rank.method = rank["method"]
+
+    hero = _consensus_single(hero_reads, "id")
+    if hero:
+        hud_info.hero.id = hero["id"]
+        hud_info.hero.name = hero["name"]
+        hud_info.hero.confidence = hero["confidence"]
+        hud_info.hero.method = hero["method"]
+
+    # --- Player & teammate names (OCR, gated on engine availability) -----------
+    recognizer = _make_name_recognizer()
+    if recognizer is not None:
+        reader = NameReader(recognizer)
+        player_reads: list[dict[str, Any] | None] = []
+        teammate_reads: list[list[dict[str, Any] | None]] = [[], []]
+        for _, image in field_frames:
+            if cancel_event.is_set():
+                raise Cancelled()
+            rh, rw = profile["reference_size"]
+            patches = []
+            rois = [profile["account_roi"], *profile.get("teammate_rois", [])]
+            for x1, y1, x2, y2 in rois:
+                patch = image[
+                    round(y1 * image.shape[0] / rh) : round(y2 * image.shape[0] / rh),
+                    round(x1 * image.shape[1] / rw) : round(x2 * image.shape[1] / rw),
+                ]
+                patches.append(patch if patch.size else np.zeros((4, 4, 3), np.uint8))
+            try:
+                values = reader(patches)
+            except Exception:
+                values = [None] * len(patches)
+            player_reads.append(values[0] if values else None)
+            for slot in range(min(2, len(values) - 1)):
+                teammate_reads[slot].append(values[slot + 1])
+
+        player = consensus_name(player_reads)
+        teammates = [consensus_name(rows) for rows in teammate_reads]
+        # Recording-wide reference: account name is the canonical self spelling.
+        player = canonical_name(player, player)
+        player_info, teammate_infos = names_to_infos(player, teammates)
+        hud_info.player_name = player_info or PlayerNameInfo()
+        hud_info.teammates = teammate_infos
+
+    # --- Combat stats (digit recognition, per-frame point-in-time) -------------
+    decode = _make_digit_decoder()
+    if decode is not None:
+        try:
+            marker = read_image(profile["counter_marker"], 0)
+            stat_frames = _even_sample(loaded, STAT_SAMPLE_MAX)
+            delta, _score = find_counter_delta([img for _, img in stat_frames], profile)
+            if delta is not None:
+                counter = StatCounter()
+                stat_reader = StatReader(decode, counter)
+                best = CombatStats()
+                for _, image in stat_frames:
+                    if cancel_event.is_set():
+                        raise Cancelled()
+                    try:
+                        stats = stat_reader.read_frame(image, profile, delta)
+                    except Exception:
+                        continue
+                    # The strip reads a live counter; peak values are the stable ones.
+                    for key in ("damage", "assists"):
+                        current = getattr(stats, key)
+                        if current is not None and (
+                            getattr(best, key) is None or current > getattr(best, key)
+                        ):
+                            setattr(best, key, current)
+                    try:
+                        regions = counter.regions(image, profile, delta)
+                        patch = regions.get("kills")
+                        if patch is not None:
+                            decoded = stat_reader.decode(patch)
+                            if decoded is not None:
+                                value = numeric(decoded[0], decoded[1], 99)
+                                if value is not None and (best.kills is None or value > best.kills):
+                                    best.kills = value
+                    except Exception:
+                        pass
+                hud_info.stats = best
+        except Exception:
+            pass
+
+    return hud_info
+
 
 # 与 manifest parametersSchema 对应的宿主策略参数；其余字段原样透传。
 _PARAM_FLOATS = (
