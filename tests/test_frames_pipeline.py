@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from copy import deepcopy
-from dataclasses import FrozenInstanceError
 import math
-from pathlib import Path
 import tempfile
 import threading
 import unittest
+from collections.abc import Iterator
+from copy import deepcopy
+from dataclasses import FrozenInstanceError
+from pathlib import Path
 from unittest.mock import Mock, patch
 from uuid import UUID
 

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "status": "awaiting-authorized-recordings-and-AHC-analysis",
+  "samples": [
+    {
+      "id": "standard-1080p",
+      "video": "private/standard-1080p.mp4",
+      "resolution": [1920, 1080],
+      "scenes": ["combat", "downed"],
+      "ahcAnalysis": "private/standard-1080p/analysis.json",
+      "sha256": null
+    },
+    {
+      "id": "ultrawide-combat-outcome",
+      "video": "private/ultrawide.mp4",
+      "resolution": [2560, 1080],
+      "scenes": ["downed", "squad-wipe", "teammate-combat", "weapon-switch"],
+      "ahcAnalysis": "private/ultrawide/analysis.json",
+      "sha256": null
+    }
+  ]
+}

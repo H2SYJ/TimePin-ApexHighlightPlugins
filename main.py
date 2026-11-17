@@ -18,6 +18,16 @@ def main() -> int:
     sys.stdin.reconfigure(encoding="utf-8", errors="strict")
     sys.stdout.reconfigure(encoding="utf-8", errors="strict", newline="\n")
     sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+    # Native extension imports (cv2 → numpy → onnxruntime) can deadlock on
+    # Windows when first executed on a worker thread while the reader thread
+    # is blocked in a pipe readline(). Warm them here, once, on the main
+    # thread before serve() spawns the run worker.
+    try:
+        import timepin_vision  # noqa: F401  (warms cv2/numpy/onnxruntime)
+    except ImportError:
+        # Recognition modules report actionable errors when they run;
+        # don't make startup fail just because the SDK is missing.
+        pass
     server = JsonRpcServer(sys.stdin, sys.stdout)
     app = Application(server, Path(__file__).resolve().parent / "plugin.json")
     server.serve(app.dispatch, prepare_run=app.prepare_run)

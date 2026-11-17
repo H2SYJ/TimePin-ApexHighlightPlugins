@@ -171,6 +171,21 @@ class SidecarTest(unittest.TestCase):
         )
         return scratch
 
+    def answer_until_response(self, ident, snake=False):
+        """Keep answering extract requests until the run response arrives.
+
+        识别管线会多次调用 frames.extract（布局探测 + 分段分析）；
+        mock 主机逐一应答，直到拿到 run 的响应为止。
+        """
+        for _ in range(50):
+            message = self.host.next()
+            if message.get("method") == "frames.extract":
+                self.answer_frames(message, snake=snake)
+                continue
+            if message.get("id") == ident and "method" not in message:
+                return message
+        raise AssertionError("Run did not complete after 50 extract requests")
+
     def test_initialize_run_progress_shutdown_unicode(self):
         initialized = self.host.initialize()["result"]
         self.assertEqual(initialized["pluginName"], "apex-highlight")
@@ -182,11 +197,11 @@ class SidecarTest(unittest.TestCase):
         self.assertEqual(request["params"]["options"]["sample_fps"], 2)
         self.assertEqual(request["params"]["options"]["mode"], "image2")
         scratch = self.answer_frames(request)
-        result = self.host.response(2)["result"]
+        result = self.answer_until_response(2)["result"]
         self.assertEqual(result["marks"], [])
         self.assertEqual(result["evidencePaths"], [])
         self.assertEqual(result["protocolVersion"], "1.0.0")
-        self.assertTrue(any("not implemented" in log for log in result["logs"]))
+        self.assertTrue(any("finalize:" in log for log in result["logs"]))
         self.assertFalse(scratch.exists())
         progress = [
             m["params"] for m in self.host.observed if m.get("method") == "progress"
@@ -207,7 +222,9 @@ class SidecarTest(unittest.TestCase):
         self.assertEqual(request["params"]["video_path"], str(self.video))
         self.assertNotIn("videoPath", request["params"])
         self.answer_frames(request, snake=True)
-        self.assertEqual(self.host.response(2)["result"]["marks"], [])
+        self.assertEqual(
+            self.answer_until_response(2, snake=True)["result"]["marks"], []
+        )
 
     def test_cancel_while_waiting_host_and_reuse_after_late_response(self):
         self.host.initialize()
@@ -228,8 +245,9 @@ class SidecarTest(unittest.TestCase):
         )
         # A stale response must not poison a later run or initialize request.
         self.host.call(4, "run", self.run_params())
-        self.answer_frames(self.next_extraction())
-        self.assertEqual(self.host.response(4)["result"]["marks"], [])
+        self.assertEqual(
+            self.answer_until_response(4)["result"]["marks"], []
+        )
 
     def test_wrong_task_cancel_and_duplicate_run(self):
         self.host.initialize()
@@ -240,7 +258,7 @@ class SidecarTest(unittest.TestCase):
         self.host.call(4, "run", self.run_params())
         self.assertEqual(self.host.response(4)["error"]["code"], -32001)
         self.answer_frames(request)
-        self.assertEqual(self.host.response(2)["result"]["marks"], [])
+        self.assertEqual(self.answer_until_response(2)["result"]["marks"], [])
 
     def test_host_error_propagates_without_crash(self):
         self.host.initialize()

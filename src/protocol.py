@@ -12,8 +12,9 @@ import math
 import sys
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, TextIO
+from typing import TextIO
 
 from .errors import Cancelled, RpcError
 
