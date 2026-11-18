@@ -1,7 +1,7 @@
 {
   "protocolVersion": "1.0.0",
   "name": "apex-highlight",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": {
     "en-US": "Apex Legends HUD recognition plugin: detects shoot/hit/kill/downed combat events with optional HUD info enrichment (rank, hero, player names, combat stats); returns classified highlight Mark[].",
     "zh-CN": "Apex 英雄 HUD 识别插件：检测射击、命中、击杀和倒地等交战事件，可选提取段位、英雄、玩家名和战斗统计等 HUD 信息；返回已分类的高光标注 Mark[]。"
