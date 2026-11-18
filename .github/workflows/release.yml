@@ -1,0 +1,91 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version override (e.g., 0.1.1)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-test.txt
+
+      - name: Run tests
+        env:
+          TIMEPIN_RUN_REAL_VIDEO: "0"
+          TIMEPIN_FFMPEG_CONTRACT: "0"
+        run: python -m pytest tests/ -v --tb=short
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          $versionOverride = "${{ github.event.inputs.version }}"
+          if ($versionOverride) {
+            $version = $versionOverride
+          } else {
+            $pluginJson = Get-Content plugin.json -Raw | ConvertFrom-Json
+            $version = $pluginJson.version
+          }
+          echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8
+
+      - name: Check if tag already exists
+        id: tag_check
+        shell: pwsh
+        run: |
+          $tag = "v${{ steps.version.outputs.version }}"
+          $exists = git tag -l $tag
+          if ($exists) {
+            echo "tag_exists=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8
+            echo "Tag $tag already exists, skipping release creation"
+          } else {
+            echo "tag_exists=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8
+          }
+
+      - name: Build plugin package
+        if: steps.tag_check.outputs.tag_exists == 'false'
+        shell: pwsh
+        run: |
+          python build_package.py --output-dir dist --format tppkg --version ${{ steps.version.outputs.version }}
+
+      - name: Create Release
+        if: steps.tag_check.outputs.tag_exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Apex Highlight v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          files: dist/*.tppkg
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
