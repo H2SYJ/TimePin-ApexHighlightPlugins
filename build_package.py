@@ -169,9 +169,10 @@ def create_package(
         # Create the archive
         if format == "tppkg":
             # .tppkg is just a .zip with a different extension
-            archive_path = output_path.with_suffix(".tppkg")
+            # Use string concatenation instead of with_suffix to handle versions like 0.1.1
+            archive_path = Path(str(output_path) + ".tppkg")
         else:
-            archive_path = output_path.with_suffix(".zip")
+            archive_path = Path(str(output_path) + ".zip")
 
         # Remove existing
         if archive_path.exists():
