@@ -3,6 +3,8 @@ name: release
 on:
   push:
     branches: [main]
+    paths:
+      - 'plugin.json'
   workflow_dispatch:
     inputs:
       version:
