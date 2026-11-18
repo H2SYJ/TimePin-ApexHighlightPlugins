@@ -13,6 +13,19 @@ PROTOCOL_VERSION = "1.0.0"
 PLUGIN_NAME = "apex-highlight"
 
 
+def _is_display_text(value: object) -> bool:
+    """Accept legacy text or a nonempty locale-to-text map, without resolving it."""
+    if isinstance(value, str):
+        return bool(value.strip())
+    return isinstance(value, dict) and bool(value) and all(
+        isinstance(locale, str)
+        and bool(locale.strip())
+        and isinstance(text, str)
+        and bool(text.strip())
+        for locale, text in value.items()
+    )
+
+
 def load_manifest(path: Path) -> dict[str, object]:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
@@ -21,12 +34,13 @@ def load_manifest(path: Path) -> dict[str, object]:
         "protocolVersion",
         "name",
         "version",
-        "description",
         "author",
         "entry",
     ):
         if not isinstance(manifest.get(field), str) or not manifest[field].strip():
             raise ValueError(f"plugin.json requires a nonempty {field}")
+    if not _is_display_text(manifest.get("description")):
+        raise ValueError("plugin.json requires a nonempty description")
     if (
         manifest["protocolVersion"] != PROTOCOL_VERSION
         or manifest["name"] != PLUGIN_NAME

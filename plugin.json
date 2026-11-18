@@ -1,8 +1,11 @@
 {
   "protocolVersion": "1.0.0",
   "name": "apex-highlight",
-  "version": "0.1.0",
-  "description": "Apex Legends HUD recognition plugin: detects shoot/hit/kill/downed combat events with optional HUD info enrichment (rank, hero, player names, combat stats); returns classified highlight Mark[].",
+  "version": "0.1.1",
+  "description": {
+    "en-US": "Apex Legends HUD recognition plugin: detects shoot/hit/kill/downed combat events with optional HUD info enrichment (rank, hero, player names, combat stats); returns classified highlight Mark[].",
+    "zh-CN": "Apex 英雄 HUD 识别插件：检测射击、命中、击杀和倒地等交战事件，可选提取段位、英雄、玩家名和战斗统计等 HUD 信息；返回已分类的高光标注 Mark[]。"
+  },
   "author": "TimePin Team",
   "entry": "main.py",
   "runtime": "python",
@@ -13,14 +16,85 @@
   ],
   "capabilities": ["videoframes", "filewrite"],
   "parametersSchema": {
-    "backend": {"type": "string", "enum": ["cpu", "dml", "cuda"], "default": "cpu"},
-    "sample_fps": {"type": "number", "exclusiveMinimum": 0, "maximum": 120, "default": 2},
-    "gap_seconds": {"type": "number", "minimum": 0, "default": 8},
-    "min_segment_seconds": {"type": "number", "exclusiveMinimum": 0, "default": 3},
-    "max_segment_seconds": {"type": "number", "exclusiveMinimum": 0, "default": 90},
-    "extract_mode": {"type": "string", "enum": ["keyframes", "image2"], "default": "keyframes"},
-    "enable_weapon_detection": {"type": "boolean", "default": true, "description": "Read active HUD weapon names and learn icon samples inside outputDir."},
-    "hud_info_enabled": {"type": "boolean", "default": false}
+    "backend": {
+      "type": "string",
+      "enum": ["cpu", "dml", "cuda"],
+      "default": "cpu",
+      "title": {"en-US": "Inference backend", "zh-CN": "推理后端"},
+      "description": {
+        "en-US": "ONNX Runtime execution provider. dml = DirectML (Windows GPU), cuda = NVIDIA CUDA.",
+        "zh-CN": "ONNX Runtime 执行后端：cpu 使用处理器，dml 使用 DirectML（Windows GPU），cuda 使用 NVIDIA CUDA。"
+      }
+    },
+    "sample_fps": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 120,
+      "default": 2,
+      "title": {"en-US": "Sampling frame rate", "zh-CN": "采样帧率"},
+      "description": {
+        "en-US": "Frame extraction rate. Higher = more accurate but slower.",
+        "zh-CN": "每秒提取的帧数；值越高，识别越精细，但处理越慢。"
+      }
+    },
+    "gap_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "default": 8,
+      "title": {"en-US": "Merge gap (seconds)", "zh-CN": "合并间隔（秒）"},
+      "description": {
+        "en-US": "Maximum gap to merge adjacent combat segments.",
+        "zh-CN": "相邻交战片段可合并的最大时间间隔，单位为秒。"
+      }
+    },
+    "min_segment_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "default": 3,
+      "title": {"en-US": "Minimum segment duration (seconds)", "zh-CN": "最短片段时长（秒）"},
+      "description": {
+        "en-US": "Minimum combat segment duration.",
+        "zh-CN": "交战片段的最短时长，单位为秒。"
+      }
+    },
+    "max_segment_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "default": 90,
+      "title": {"en-US": "Maximum segment duration (seconds)", "zh-CN": "最长片段时长（秒）"},
+      "description": {
+        "en-US": "Maximum combat segment duration.",
+        "zh-CN": "交战片段的最长时长，单位为秒。"
+      }
+    },
+    "extract_mode": {
+      "type": "string",
+      "enum": ["keyframes", "image2"],
+      "default": "keyframes",
+      "title": {"en-US": "Frame extraction mode", "zh-CN": "抽帧模式"},
+      "description": {
+        "en-US": "FFmpeg extraction mode: keyframes = I-frames only, image2 = all frames at sample_fps.",
+        "zh-CN": "FFmpeg 抽帧模式：keyframes 仅提取 I 帧，image2 按 sample_fps 采样视频帧。"
+      }
+    },
+    "enable_weapon_detection": {
+      "type": "boolean",
+      "default": true,
+      "title": {"en-US": "Weapon detection", "zh-CN": "武器识别"},
+      "description": {
+        "en-US": "Read active HUD weapon names and learn icon samples inside outputDir.",
+        "zh-CN": "读取 HUD 中当前武器的名称，并在 outputDir 中学习图标样本。"
+      }
+    },
+    "hud_info_enabled": {
+      "type": "boolean",
+      "default": false,
+      "title": {"en-US": "HUD information extraction", "zh-CN": "HUD 信息提取"},
+      "description": {
+        "en-US": "Enable HUD info extraction (rank, hero, names, stats) — experimental.",
+        "zh-CN": "启用段位、英雄、玩家名和战斗统计等 HUD 信息提取（实验性功能）。"
+      }
+    }
   },
   "outputSchema": {
     "marks": {"type": "array", "description": "TimePin Mark[] — combat segments kept/reviewed with classification, decision, and outcome metadata."},
