@@ -189,7 +189,7 @@ class SidecarTest(unittest.TestCase):
     def test_initialize_run_progress_shutdown_unicode(self):
         initialized = self.host.initialize()["result"]
         self.assertEqual(initialized["pluginName"], "apex-highlight")
-        self.assertEqual(initialized["version"], "0.1.0")
+        self.assertEqual(initialized["version"], "0.1.1")
         self.assertTrue(initialized["capabilities"]["cancellation"])
         self.host.call(2, "run", self.run_params(extract_mode="image2"))
         request = self.next_extraction()
