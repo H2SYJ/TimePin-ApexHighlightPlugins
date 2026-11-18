@@ -71,7 +71,7 @@ class ManifestTests(unittest.TestCase):
         for field, expected in {
             "protocolVersion": "1.0.0",
             "name": "apex-highlight",
-            "version": "0.1.0",
+            "version": "0.1.1",
             "entry": "main.py",
             "runtime": "python",
             "capabilities": ["videoframes", "filewrite"],
